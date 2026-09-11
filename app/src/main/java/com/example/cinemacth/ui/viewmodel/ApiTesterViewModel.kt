@@ -23,6 +23,10 @@ class ApiTesterViewModel @Inject constructor(
 
     private val gson = Gson()
 
+    init {
+        performGetUsers()
+    }
+
     fun performGetUsers() {
         executeRequest("GET", "users") { repository.getUsers() }
     }
@@ -36,11 +40,16 @@ class ApiTesterViewModel @Inject constructor(
     }
 
     fun performCreateUser(name: String, email: String, pass: String) {
-        if (name.isEmpty() || email.isEmpty() || pass.isEmpty()) {
-            _apiState.value = ApiState.Error("Todos los campos son obligatorios")
+        if (name.isEmpty() || email.isEmpty()) {
+            _apiState.value = ApiState.Error("Nombre y Email son obligatorios")
             return
         }
-        val user = User(name = name, email = email, password = pass)
+        val user = User(
+            name = name, 
+            email = email, 
+            username = name.lowercase().replace(" ", "."),
+            phone = "555-1234"
+        )
         val bodyJson = gson.toJson(user)
         executeRequest("POST", "users", bodyJson) { repository.createUser(user) }
     }
@@ -50,7 +59,12 @@ class ApiTesterViewModel @Inject constructor(
             _apiState.value = ApiState.Error("ID, Nombre y Email son obligatorios")
             return
         }
-        val user = User(name = name, email = email)
+        val user = User(
+            id = id.toIntOrNull(),
+            name = name, 
+            email = email,
+            username = "updated.user"
+        )
         val bodyJson = gson.toJson(user)
         executeRequest("PUT", "users/$id", bodyJson) { repository.updateUser(id, user) }
     }
