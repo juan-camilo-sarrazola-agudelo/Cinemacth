@@ -26,6 +26,7 @@ fun ApiTesterScreen(viewModel: ApiTesterViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("LISTAR", "REGISTRAR", "EDITAR", "BORRAR")
     val apiState by viewModel.apiState.collectAsState()
+    val users by viewModel.users.collectAsState()
 
     Scaffold(
         topBar = {
@@ -44,7 +45,9 @@ fun ApiTesterScreen(viewModel: ApiTesterViewModel) {
                         selected = selectedTab == index,
                         onClick = { 
                             selectedTab = index 
-                            if (index == 0) viewModel.performGetUsers()
+                            // No es necesario llamar a loadUsers si ya es reactivo, 
+                            // pero lo dejamos por si se quiere forzar refresco
+                            if (index == 0) viewModel.loadUsers()
                         },
                         text = { Text(title) }
                     )
@@ -54,7 +57,7 @@ fun ApiTesterScreen(viewModel: ApiTesterViewModel) {
             Spacer(modifier = Modifier.height(16.dp))
 
             when (selectedTab) {
-                0 -> ListSection(apiState)
+                0 -> ListSection(users, apiState)
                 1 -> PostSection(viewModel, apiState)
                 2 -> PutSection(viewModel, apiState)
                 3 -> DeleteSection(viewModel, apiState)
@@ -64,28 +67,21 @@ fun ApiTesterScreen(viewModel: ApiTesterViewModel) {
 }
 
 @Composable
-fun ListSection(state: ApiState<Any>) {
+fun ListSection(users: List<User>, state: ApiState<Any>) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("Miembros de la Comunidad", style = MaterialTheme.typography.titleMedium)
+        Text("Miembros de la Comunidad (${users.size})", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
 
-        when (state) {
-            is ApiState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            is ApiState.Error -> Text("Error: ${state.message}", color = Color.Red)
-            is ApiState.Success -> {
-                val users = state.data as? List<*>
-                if (users != null) {
-                    LazyColumn {
-                        items(users) { item ->
-                            val user = item as? User
-                            user?.let { UserListItem(it) }
-                        }
-                    }
-                } else if (state.data is User) {
-                    UserListItem(state.data as User)
+        if (state is ApiState.Loading && users.isEmpty()) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+        } else if (users.isEmpty()) {
+            Text("No hay miembros registrados.")
+        } else {
+            LazyColumn {
+                items(users) { user ->
+                    UserListItem(user)
                 }
             }
-            else -> Text("Pulsa LISTAR para cargar.")
         }
     }
 }
@@ -121,14 +117,14 @@ fun PostSection(viewModel: ApiTesterViewModel, state: ApiState<Any>) {
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre Completo") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo Electrónico") }, modifier = Modifier.fillMaxWidth())
         Button(
-            onClick = { viewModel.performCreateUser(name, email, "") },
+            onClick = { viewModel.performCreateUser(name, email) },
             modifier = Modifier.padding(top = 16.dp).fillMaxWidth()
         ) {
             Text("Registrar Miembro")
         }
 
         if (state is ApiState.Success && state.method == "POST") {
-            SuccessMessage("¡${(state.data as User).name} ha sido registrado!")
+            SuccessMessage("¡Usuario registrado con éxito!")
         } else if (state is ApiState.Error) {
             Text(state.message, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
@@ -178,7 +174,7 @@ fun DeleteSection(viewModel: ApiTesterViewModel, state: ApiState<Any>) {
         }
 
         if (state is ApiState.Success && state.method == "DELETE") {
-            SuccessMessage("Miembro eliminado de la base de datos.")
+            SuccessMessage("Miembro eliminado de la base de datos local.")
         }
 
         if (showConfirm) {

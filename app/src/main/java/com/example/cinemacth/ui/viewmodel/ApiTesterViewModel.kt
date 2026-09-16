@@ -21,14 +21,31 @@ class ApiTesterViewModel @Inject constructor(
     private val _apiState = MutableStateFlow<ApiState<Any>>(ApiState.Idle)
     val apiState: StateFlow<ApiState<Any>> = _apiState
 
+    // Única fuente de verdad para la lista de usuarios en la UI
+    private val _users = MutableStateFlow<List<User>>(emptyList())
+    val users: StateFlow<List<User>> = _users
+
     private val gson = Gson()
 
     init {
-        performGetUsers()
+        loadUsers()
+    }
+
+    fun loadUsers() {
+        viewModelScope.launch {
+            _apiState.value = ApiState.Loading
+            val response = repository.getUsers()
+            if (response.isSuccessful) {
+                _users.value = response.body() ?: emptyList()
+                _apiState.value = ApiState.Idle
+            } else {
+                _apiState.value = ApiState.Error("Error al cargar usuarios")
+            }
+        }
     }
 
     fun performGetUsers() {
-        executeRequest("GET", "users") { repository.getUsers() }
+        loadUsers()
     }
 
     fun performGetUserById(id: String) {
@@ -39,7 +56,7 @@ class ApiTesterViewModel @Inject constructor(
         executeRequest("GET", "users/$id") { repository.getUserById(id) }
     }
 
-    fun performCreateUser(name: String, email: String, pass: String) {
+    fun performCreateUser(name: String, email: String) {
         if (name.isEmpty() || email.isEmpty()) {
             _apiState.value = ApiState.Error("Nombre y Email son obligatorios")
             return
@@ -51,7 +68,14 @@ class ApiTesterViewModel @Inject constructor(
             phone = "555-1234"
         )
         val bodyJson = gson.toJson(user)
-        executeRequest("POST", "users", bodyJson) { repository.createUser(user) }
+        executeRequest("POST", "users", bodyJson) { 
+            val resp = repository.createUser(user)
+            if (resp.isSuccessful) {
+                // Actualizamos la lista local inmediatamente
+                _users.value = _users.value + (resp.body()!!)
+            }
+            resp
+        }
     }
 
     fun performUpdateUser(id: String, name: String, email: String) {
@@ -66,7 +90,14 @@ class ApiTesterViewModel @Inject constructor(
             username = "updated.user"
         )
         val bodyJson = gson.toJson(user)
-        executeRequest("PUT", "users/$id", bodyJson) { repository.updateUser(id, user) }
+        executeRequest("PUT", "users/$id", bodyJson) { 
+            val resp = repository.updateUser(id, user)
+            if (resp.isSuccessful) {
+                // Actualizamos la lista local inmediatamente
+                _users.value = _users.value.map { if (it.id.toString() == id) resp.body()!! else it }
+            }
+            resp
+        }
     }
 
     fun performDeleteUser(id: String) {
@@ -74,7 +105,14 @@ class ApiTesterViewModel @Inject constructor(
             _apiState.value = ApiState.Error("El ID es obligatorio")
             return
         }
-        executeRequest("DELETE", "users/$id") { repository.deleteUser(id) }
+        executeRequest("DELETE", "users/$id") { 
+            val resp = repository.deleteUser(id)
+            if (resp.isSuccessful) {
+                // Actualizamos la lista local inmediatamente
+                _users.value = _users.value.filter { it.id.toString() != id }
+            }
+            resp
+        }
     }
 
     private fun <T> executeRequest(
@@ -100,21 +138,13 @@ class ApiTesterViewModel @Inject constructor(
                     _apiState.value = ApiState.Success(
                         data = it.body() ?: "Operación exitosa",
                         statusCode = it.code(),
-                        url = it.raw().request.url.toString(),
+                        url = "Local/InMemory",
                         method = method,
                         responseTime = time,
                         requestBody = requestBody
                     )
                 } else {
-                    val errorMsg = when (it.code()) {
-                        400 -> "400 - Solicitud incorrecta"
-                        401 -> "401 - No autorizado"
-                        403 -> "403 - Prohibido"
-                        404 -> "404 - No encontrado"
-                        500 -> "500 - Error del servidor"
-                        else -> "Error: ${it.code()}"
-                    }
-                    _apiState.value = ApiState.Error(errorMsg, it.code())
+                    _apiState.value = ApiState.Error("Error: ${it.code()}", it.code())
                 }
             }
         }
