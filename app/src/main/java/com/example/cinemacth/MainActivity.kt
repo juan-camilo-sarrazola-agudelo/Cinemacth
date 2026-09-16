@@ -107,8 +107,8 @@ fun MainApp() {
                 }
             }
             composable(Screen.Users.route) {
-                val viewModel: ApiTesterViewModel = hiltViewModel()
-                ApiTesterScreen(viewModel)
+                val viewModel: CommunityViewModel = hiltViewModel()
+                CommunityScreen(viewModel)
             }
             composable(Screen.Favorites.route) {
                 val viewModel: FavoritesViewModel = hiltViewModel()
