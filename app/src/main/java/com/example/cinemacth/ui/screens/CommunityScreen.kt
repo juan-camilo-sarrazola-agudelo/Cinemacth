@@ -1,8 +1,12 @@
 package com.example.cinemacth.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -26,6 +30,30 @@ fun CommunityScreen(viewModel: CommunityViewModel) {
     var showUserDialog by remember { mutableStateOf(false) }
     var userToEdit by remember { mutableStateOf<User?>(null) }
 
+    val lazyListState = rememberLazyListState()
+    var isFabVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(lazyListState) {
+        var previousIndex = 0
+        var previousScrollOffset = 0
+        snapshotFlow { Pair(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) }
+            .collect { (currentIndex, currentScrollOffset) ->
+                if (currentIndex > previousIndex) {
+                    isFabVisible = false
+                } else if (currentIndex < previousIndex) {
+                    isFabVisible = true
+                } else {
+                    if (currentScrollOffset > previousScrollOffset) {
+                        isFabVisible = false
+                    } else if (currentScrollOffset < previousScrollOffset) {
+                        isFabVisible = true
+                    }
+                }
+                previousIndex = currentIndex
+                previousScrollOffset = currentScrollOffset
+            }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -37,11 +65,17 @@ fun CommunityScreen(viewModel: CommunityViewModel) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                userToEdit = null
-                showUserDialog = true
-            }) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar Usuario")
+            AnimatedVisibility(
+                visible = isFabVisible,
+                enter = scaleIn(),
+                exit = scaleOut()
+            ) {
+                FloatingActionButton(onClick = {
+                    userToEdit = null
+                    showUserDialog = true
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar Usuario")
+                }
             }
         }
     ) { padding ->
@@ -57,7 +91,11 @@ fun CommunityScreen(viewModel: CommunityViewModel) {
                     if (state.users.isEmpty()) {
                         Text("No hay miembros en la comunidad todavía.", modifier = Modifier.align(Alignment.Center))
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+                        LazyColumn(
+                            state = lazyListState,
+                            contentPadding = PaddingValues(bottom = 80.dp),
+                            modifier = Modifier.fillMaxSize().padding(8.dp)
+                        ) {
                             items(state.users) { user ->
                                 UserCard(
                                     user = user,
