@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Home : Screen("home", "Cine", Icons.Default.Home)
     object Search : Screen("search", "Buscar", Icons.Default.Search)
+    object Swipe : Screen("swipe", "Match", Icons.Default.Star)
     object Users : Screen("users", "Usuarios", Icons.Default.AccountCircle)
     object Favorites : Screen("favorites", "Lista", Icons.Default.Favorite)
     object Detail : Screen("detail/{movieId}", "Detalle", Icons.Default.Home) {
@@ -61,6 +63,7 @@ fun MainApp() {
     val items = listOf(
         Screen.Home,
         Screen.Search,
+        Screen.Swipe,
         Screen.Users,
         Screen.Favorites
     )
@@ -103,6 +106,12 @@ fun MainApp() {
             composable(Screen.Search.route) {
                 val viewModel: MovieViewModel = hiltViewModel()
                 SearchScreen(viewModel) { movieId ->
+                    navController.navigate(Screen.Detail.createRoute(movieId))
+                }
+            }
+            composable(Screen.Swipe.route) {
+                val viewModel: SwipeViewModel = hiltViewModel()
+                SwipeScreen(viewModel) { movieId ->
                     navController.navigate(Screen.Detail.createRoute(movieId))
                 }
             }
